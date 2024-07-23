@@ -1,17 +1,34 @@
 package org.pvp.pvponedoteight;
-
-import org.bukkit.Bukkit;
-import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.java.JavaPlugin;
-
-import javax.net.ssl.HttpsURLConnection;
-import java.io.*;
+/*
+ * This Metrics class was auto-generated and can be copied into your project if you are
+ * not using a build tool like Gradle or Maven for dependency management.
+ *
+ * IMPORTANT: You are not allowed to modify this class, except changing the package.
+ *
+ * Disallowed modifications include but are not limited to:
+ *  - Remove the option for users to opt-out
+ *  - Change the frequency for data submission
+ *  - Obfuscate the code (every obfuscator should allow you to make an exception for specific files)
+ *  - Reformat the code (if you use a linter, add an exception)
+ *
+ * Violations will result in a ban of your plugin and account from bStats.
+ */
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -22,6 +39,12 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
+import javax.net.ssl.HttpsURLConnection;
+import org.bukkit.Bukkit;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public class Metrics {
 
@@ -99,7 +122,7 @@ public class Metrics {
     public void addCustomChart(CustomChart chart) {
         metricsBase.addCustomChart(chart);
     }
-//bukkitVersion
+
     private void appendPlatformData(JsonObjectBuilder builder) {
         builder.appendField("playerAmount", getPlayerAmount());
         builder.appendField("onlineMode", Bukkit.getOnlineMode() ? 1 : 0);
