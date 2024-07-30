@@ -18,7 +18,7 @@ public class UpdateChecker {
     private final String projectName;
     private String features = "";
     private boolean isInformed = false;
-
+    private boolean starting = true;
 
     public UpdateChecker(PVPOneDotEight main, boolean loop) {
         this.main = main;
@@ -123,10 +123,18 @@ public class UpdateChecker {
                     " available at: " + Url, NamedTextColor.GREEN);
 
         } else if (versionStatus == 0) {
+
+            if (!starting) return;
             component = Component.text(" You have the latest released version!", NamedTextColor.GREEN);
+
         } else if (versionStatus == 1) {
+
+            if (!starting) return;
             component = Component.text(" Congrats, you are testing a new version!", NamedTextColor.YELLOW);
+
         } else {
+
+            if (!starting) return;
             component = Component.text(" Unknown error checking version (" + versionStatus + ")" + serverVersion + "   " + currentVersion, NamedTextColor.RED);
         }
 
@@ -136,6 +144,7 @@ public class UpdateChecker {
                 .append(component)
         );
 
+        starting=false;
     }
 
 }

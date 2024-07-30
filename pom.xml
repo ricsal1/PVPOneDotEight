@@ -6,7 +6,7 @@
 
   <groupId>org.pvp</groupId>
   <artifactId>PVPOneDotEight</artifactId>
-  <version>0.9.8</version>
+  <version>0.9.9</version>
   <packaging>jar</packaging>
 
   <name>PVPOneDotEight</name>

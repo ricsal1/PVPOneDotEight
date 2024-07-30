@@ -15,7 +15,7 @@ public class UpdateCheckerBukkSpig {
     private final PVPOneDotEight main;
     private final String projectName;
     private boolean isInformed = false;
-
+    private boolean starting = true;
 
     public UpdateCheckerBukkSpig(PVPOneDotEight main, boolean loop) {
         this.main = main;
@@ -95,10 +95,17 @@ public class UpdateCheckerBukkSpig {
             }
 
         } else if (versionStatus == 0) {
+
+            if (!starting) return;
             Bukkit.getConsoleSender().sendMessage("[" + projectName + "] " + ChatColor.DARK_GREEN + "You have the latest released version");
+
         } else if (versionStatus == 1) {
+
+            if (!starting) return;
             Bukkit.getConsoleSender().sendMessage("[" + projectName + "] " + ChatColor.YELLOW + "Congrats, you are testing a new version!");
+
         } else {
+            if (!starting) return;
             Bukkit.getConsoleSender().sendMessage("[" + projectName + "] " + ChatColor.RED + "Unknown error checking version (" + versionStatus + ")" + serverVersion + "   " + currentVersion);
         }
 

@@ -26,9 +26,8 @@ import org.pvp.pvponedoteight.Utils.UpdateChecker;
 import org.pvp.pvponedoteight.Utils.UpdateCheckerBukkSpig;
 
 import java.io.File;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Callable;
+
 
 public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
@@ -41,6 +40,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     private boolean specialEffects;
     private boolean noCooldown;
     private boolean fastRespawn;
+    private boolean normalizeHackedItems;
 
     @Override
     public void onEnable() {
@@ -59,21 +59,6 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
         try {
             Metrics metrics = new Metrics(this, 22590);
-
-//            metrics.addCustomChart(new Metrics.AdvancedPie("Test", new Callable<Map<String, Integer>>() {
-//                @Override
-//                public Map<String, Integer> call() throws Exception {
-//                    int ticks = getServer().getCurrentTick();
-//
-//                    Map<String, Integer> valueMap = new HashMap<>();
-//                    valueMap.put("Uptime h", (ticks / 20 / 60 / 60));
-//                    valueMap.put("Version", Integer.parseInt(VERSION.replace(".", "")));
-//                    valueMap.put("Apple", getPlayersWithFood(Material.APPLE));
-//                    valueMap.put("test", getPlayersWithFood(Material.BREAD));
-//                    return valueMap;
-//                }
-//
-//            }));
 
             metrics.addCustomChart(new Metrics.SimplePie("check_online", () -> {
                 if (checkOnlineUpdate) return "true";
@@ -96,6 +81,11 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
             metrics.addCustomChart(new Metrics.SimplePie("special_effects", () -> {
                 if (specialEffects) return "true";
+                return "false";
+            }));
+
+            metrics.addCustomChart(new Metrics.SimplePie("normalize_Hacked_Items", () -> {
+                if (normalizeHackedItems) return "true";
                 return "false";
             }));
 
@@ -124,6 +114,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         try {
             checkOnlineUpdate = config.getBoolean("checkUpdate", true);
             specialEffects = config.getBoolean("specialEffects", false);
+            normalizeHackedItems = config.getBoolean("normalizeHackedItems", false);
 
             maxCPS = config.getInt("maxCPS", 16);
             noCooldown = config.getBoolean("noCooldown", false);
@@ -143,6 +134,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         config.options().header("==== PVPOneDotEight Configs ====");
         config.addDefault("checkUpdate", true);
         config.addDefault("specialEffects", false);
+        config.addDefault("normalizeHackedItems", false);
 
         config.options().copyDefaults(true);
         saveConfig();
@@ -162,20 +154,22 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             instance.setBaseValue(maxCPS);
         }
 
-//        for (int i = 0; i < player.getInventory().getSize(); i++) {
-//            ItemStack item = player.getInventory().getItem(i);
-//            if (item != null && item.getEnchantments() != null) {
-//
-//                for (Map.Entry<Enchantment, Integer> entry : item.getEnchantments().entrySet()) {
-//                    int level = entry.getValue();
-//
-//                    if (level >= 6) {
-//                        item.removeEnchantment(entry.getKey());
-//                        break;
-//                    }
-//                }
-//            }
-//        }
+        if (normalizeHackedItems) {
+            for (int i = 0; i < player.getInventory().getSize(); i++) {
+                ItemStack item = player.getInventory().getItem(i);
+                if (item != null && item.getEnchantments() != null) {
+
+                    for (Map.Entry<Enchantment, Integer> entry : item.getEnchantments().entrySet()) {
+                        int level = entry.getValue();
+
+                        if (level >= 6) {
+                            item.removeEnchantment(entry.getKey());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
 
@@ -245,16 +239,18 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onEntityHit(EntityDamageByEntityEvent event) {
 
-        // && event.getEntity() instanceof Player
-        if (event.getDamager() instanceof Player) {
+        if (noCooldown) {
 
-            Player attacker = (Player) event.getDamager();
-            float cooldown = attacker.getAttackCooldown();
+            if (event.getDamager() instanceof Player && event.getEntity() instanceof Player) {
 
-            if (cooldown < 1.0) {
-                event.setDamage(event.getDamage() * (1 / cooldown));
+                Player attacker = (Player) event.getDamager();
+                float cooldown = attacker.getAttackCooldown();
+
+                if (cooldown < 1.0) {
+                    event.setDamage(event.getDamage() * (1 / cooldown));
+                }
+
             }
-
         }
     }
 
