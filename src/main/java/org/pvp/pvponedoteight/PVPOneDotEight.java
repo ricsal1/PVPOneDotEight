@@ -12,6 +12,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPlaceEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -41,6 +42,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     private boolean noCooldown;
     private boolean fastRespawn;
     private boolean normalizeHackedItems;
+    private String workingWorld;
 
     @Override
     public void onEnable() {
@@ -57,6 +59,58 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             new UpdateChecker(this, checkOnlineUpdate);
         }
 
+        startMetrics();
+
+        getLogger().info(VERSION + " enabled on " + version + "!");
+        isInit = false;
+    }
+
+    @Override
+    public void onDisable() {
+        getLogger().info(VERSION + " disabled!");
+    }
+
+
+    public void LoadSettings() {
+        FileConfiguration config = getConfig();
+        File dataFolder = getDataFolder();
+
+        if (!dataFolder.exists()) {
+            setupConfig();
+        }
+
+        try {
+            workingWorld = config.getString("workingWorld", "");
+            checkOnlineUpdate = config.getBoolean("checkUpdate", true);
+            specialEffects = config.getBoolean("specialEffects", false);
+            normalizeHackedItems = config.getBoolean("normalizeHackedItems", false);
+
+            maxCPS = config.getInt("maxCPS", 16);
+            noCooldown = config.getBoolean("noCooldown", false);
+            fastRespawn = config.getBoolean("fastRespawn", false);
+        } catch (Exception e) {
+            maxCPS = 16;
+        }
+    }
+
+
+    private void setupConfig() {
+        FileConfiguration config = getConfig();
+        File dataFolder = getDataFolder();
+
+        if (!dataFolder.exists()) dataFolder.mkdir();
+
+        config.options().header("==== PVPOneDotEight Configs ====");
+        config.addDefault("checkUpdate", true);
+        config.addDefault("specialEffects", false);
+        config.addDefault("normalizeHackedItems", false);
+
+        config.options().copyDefaults(true);
+        saveConfig();
+    }
+
+
+    private void startMetrics() {
         try {
             Metrics metrics = new Metrics(this, 22590);
 
@@ -92,58 +146,16 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         } catch (Exception e) {
             getLogger().info(ChatColor.RED + " Failed to register into Bstats");
         }
-
-        getLogger().info(VERSION + " enabled on " + version + "!");
-        isInit = false;
-    }
-
-    @Override
-    public void onDisable() {
-        getLogger().info(VERSION + " disabled!");
-    }
-
-
-    public void LoadSettings() {
-        FileConfiguration config = getConfig();
-        File dataFolder = getDataFolder();
-
-        if (!dataFolder.exists()) {
-            setupConfig();
-        }
-
-        try {
-            checkOnlineUpdate = config.getBoolean("checkUpdate", true);
-            specialEffects = config.getBoolean("specialEffects", false);
-            normalizeHackedItems = config.getBoolean("normalizeHackedItems", false);
-
-            maxCPS = config.getInt("maxCPS", 16);
-            noCooldown = config.getBoolean("noCooldown", false);
-            fastRespawn = config.getBoolean("fastRespawn", false);
-        } catch (Exception e) {
-            maxCPS = 16;
-        }
-    }
-
-
-    private void setupConfig() {
-        FileConfiguration config = getConfig();
-        File dataFolder = getDataFolder();
-
-        if (!dataFolder.exists()) dataFolder.mkdir();
-
-        config.options().header("==== PVPOneDotEight Configs ====");
-        config.addDefault("checkUpdate", true);
-        config.addDefault("specialEffects", false);
-        config.addDefault("normalizeHackedItems", false);
-
-        config.options().copyDefaults(true);
-        saveConfig();
     }
 
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        String world = player.getWorld().getName();
+
+        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+
         String key;
         AttributeInstance instance;
 
@@ -174,6 +186,36 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
 
     @EventHandler(ignoreCancelled = true)
+    public void onPlayerChangedWorldEvent(PlayerChangedWorldEvent event) {
+        Player player = event.getPlayer();
+        String world = player.getWorld().getName();
+
+        String key;
+        AttributeInstance instance;
+
+        //exiting world
+        if (!workingWorld.equals("") && !world.equals(workingWorld)) {
+            key = Attribute.GENERIC_ATTACK_SPEED.name();
+            instance = player.getAttribute(Attribute.valueOf(key));
+
+            if (instance != null && instance.getBaseValue() != 4) {
+                instance.setBaseValue(4);
+            }
+
+        } else if (!workingWorld.equals("") && world.equals(workingWorld)) { //entering world
+            key = Attribute.GENERIC_ATTACK_SPEED.name();
+            instance = player.getAttribute(Attribute.valueOf(key));
+
+            if (instance != null && instance.getBaseValue() == 4) {
+                instance.setBaseValue(maxCPS);
+            }
+        }
+        //else doesnt do anything, like before
+
+    }
+
+
+    @EventHandler(ignoreCancelled = true)
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         String key;
@@ -190,9 +232,10 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onEntityPlaceEvent(@NotNull EntityPlaceEvent event) {
-
         Location location = event.getBlock().getLocation();
         String myWorld = location.getWorld().getName();
+
+        if (!workingWorld.equals("") && !myWorld.equals(workingWorld)) return;
 
         if (event.getEntityType() == EntityType.END_CRYSTAL && !(myWorld.endsWith("_nether") || myWorld.endsWith("_end"))) {
             event.setCancelled(true);
@@ -203,6 +246,9 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onSelect(PlayerItemHeldEvent event) {
         Player player = event.getPlayer();
+        String world = player.getWorld().getName();
+
+        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
 
         //with delay checks current selected item...
         mybukkit.runTaskLater(player, null, null, () -> {
@@ -238,6 +284,9 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onEntityHit(EntityDamageByEntityEvent event) {
+        String world = event.getDamager().getWorld().getName();
+
+        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
 
         if (noCooldown) {
 
@@ -258,6 +307,9 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getPlayer();
+        String world = player.getWorld().getName();
+
+        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
 
         if (specialEffects) {
             mybukkit.runTaskLater(player, null, null, () -> {
