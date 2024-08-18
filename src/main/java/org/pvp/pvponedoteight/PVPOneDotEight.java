@@ -12,6 +12,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPlaceEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -182,6 +183,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
                 }
             }
         }
+
+        preparePlayer(player);
     }
 
 
@@ -209,6 +212,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             if (instance != null && instance.getBaseValue() == 4) {
                 instance.setBaseValue(maxCPS);
             }
+
+            preparePlayer(player);
         }
         //else doesnt do anything, like before
 
@@ -252,31 +257,23 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
         //with delay checks current selected item...
         mybukkit.runTaskLater(player, null, null, () -> {
-                    ItemStack it = player.getInventory().getItemInMainHand();
-                    String weapon = it.getType().toString();
+                    filterPlayerInventory(player);
+                    //potions and golden apples??
+                }
+                , 5);
+    }
 
-                    if ((weapon.contains("SWORD") && it.containsEnchantment(Enchantment.SWEEPING_EDGE))) {
 
-                        int level = it.getEnchantments().get(Enchantment.SWEEPING_EDGE).intValue();
+    @EventHandler(ignoreCancelled = true)
+    public void onInventoryClick(InventoryClickEvent e) {
+        Player player = (Player) e.getWhoClicked();
+        String world = player.getWorld().getName();
 
-                        it.removeEnchantment(Enchantment.SWEEPING_EDGE);
+        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
 
-                        Repairable newSword = (Repairable) it.getItemMeta();
-
-                        int repairCost = newSword.getRepairCost();
-                        //small compensation for previous versions
-                        if (repairCost > 120) repairCost = (repairCost / 2);
-
-                        newSword.setRepairCost((repairCost / 2));
-                        it.setItemMeta(newSword);
-
-                        ItemStack book = new ItemStack(Material.ENCHANTED_BOOK, 1);
-                        EnchantmentStorageMeta bookmeta = (EnchantmentStorageMeta) book.getItemMeta();
-                        bookmeta.addStoredEnchant(Enchantment.SWEEPING_EDGE, level, true);
-                        book.setItemMeta(bookmeta);
-
-                        player.getInventory().addItem(book);
-                    }
+        mybukkit.runTaskLater(player, null, null, () -> {
+                    filterPlayerInventory(player);
+                    //potions and golden apples??
                 }
                 , 5);
     }
@@ -332,6 +329,82 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             player.spigot().respawn();
 
         }, 40L);
+    }
+
+
+    private void filterPlayerInventory(Player player) {
+        ItemStack it1 = player.getInventory().getItemInMainHand();
+        ItemStack it2 = player.getInventory().getItemInOffHand();
+        String item1 = it1.getType().toString();
+        String item2 = it2.getType().toString();
+
+        if ((item1.contains("SWORD") && it1.containsEnchantment(Enchantment.SWEEPING_EDGE))) {
+
+            int level = it1.getEnchantments().get(Enchantment.SWEEPING_EDGE).intValue();
+
+            it1.removeEnchantment(Enchantment.SWEEPING_EDGE);
+
+            Repairable newSword = (Repairable) it1.getItemMeta();
+
+            int repairCost = newSword.getRepairCost();
+            //small compensation for previous versions
+            if (repairCost > 120) repairCost = (repairCost / 2);
+
+            newSword.setRepairCost((repairCost / 2));
+            it1.setItemMeta(newSword);
+
+            ItemStack book = new ItemStack(Material.ENCHANTED_BOOK, 1);
+            EnchantmentStorageMeta bookmeta = (EnchantmentStorageMeta) book.getItemMeta();
+            bookmeta.addStoredEnchant(Enchantment.SWEEPING_EDGE, level, true);
+            book.setItemMeta(bookmeta);
+
+            player.getInventory().addItem(book);
+        }
+
+        if (item1.contains("TOTEM")) {
+            player.getEnderChest().addItem(it1);
+            player.getInventory().remove(it1);
+            player.sendMessage("This is PVP 1.8, Totem of Undying is not used");
+        }
+
+        if (item2.contains("TOTEM")) {
+            player.getEnderChest().addItem(it2);
+            player.getInventory().setItemInOffHand(new ItemStack(Material.AIR, 1));
+            player.sendMessage("This is PVP 1.8, Totem of Undying is not used");
+        }
+    }
+
+
+    private void preparePlayer(Player player) {
+        ItemStack it = player.getInventory().getItemInOffHand();
+
+        if (it != null) {
+            String myItem = it.getType().toString();
+
+            if ((myItem.contains("SHIELD"))) {
+                return;
+            }
+
+            if (myItem.contains("TOTEM")) {
+                player.getEnderChest().addItem(it);
+                player.getInventory().setItemInOffHand(new ItemStack(Material.AIR, 1));
+            } else {
+                player.getInventory().remove(it);
+            }
+
+            //any free place on normal inventary
+            player.getInventory().addItem(it);
+        }
+
+        if (player.getInventory().contains(Material.SHIELD)) {
+            player.getInventory().remove(Material.SHIELD);
+            ItemStack it2 = new ItemStack(Material.SHIELD, 1);
+            player.getInventory().setItemInOffHand(it2);
+            return;
+        }
+
+        ItemStack it2 = new ItemStack(Material.SHIELD, 1);
+        player.getInventory().setItemInOffHand(it2);
     }
 
 
