@@ -5,27 +5,25 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.FishHook;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPlaceEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.Repairable;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
-import org.pvp.pvponedoteight.Utils.Metrics;
-import org.pvp.pvponedoteight.Utils.MyBukkit;
-import org.pvp.pvponedoteight.Utils.UpdateChecker;
-import org.pvp.pvponedoteight.Utils.UpdateCheckerBukkSpig;
+import org.pvp.pvponedoteight.Utils.*;
 
 import java.io.File;
 import java.util.Map;
@@ -51,6 +49,10 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         LoadSettings();
         mybukkit = new MyBukkit(this);
         getServer().getPluginManager().registerEvents(this, this);
+
+        if (Utils.checkGreater("1.21.1",Bukkit.getServer().getBukkitVersion()) == -1) {
+            getLogger().severe(" You are using a Minecraft Server version with possible data loss and known exploits, get informed and evaluate updating to 1.21.1");
+        }
 
         String version = Bukkit.getServer().getName().toUpperCase();
 
@@ -87,7 +89,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             normalizeHackedItems = config.getBoolean("normalizeHackedItems", false);
 
             maxCPS = config.getInt("maxCPS", 16);
-            noCooldown = config.getBoolean("noCooldown", false);
+            noCooldown = config.getBoolean("noCooldown", true);
             fastRespawn = config.getBoolean("fastRespawn", false);
         } catch (Exception e) {
             maxCPS = 16;
@@ -105,6 +107,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         config.addDefault("checkUpdate", true);
         config.addDefault("specialEffects", false);
         config.addDefault("normalizeHackedItems", false);
+        config.addDefault("noCooldown", true);
 
         config.options().copyDefaults(true);
         saveConfig();
@@ -157,33 +160,6 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
         if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
 
-        String key;
-        AttributeInstance instance;
-
-        key = Attribute.GENERIC_ATTACK_SPEED.name();
-        instance = player.getAttribute(Attribute.valueOf(key));
-
-        if (instance != null && instance.getBaseValue() == 4) {
-            instance.setBaseValue(maxCPS);
-        }
-
-        if (normalizeHackedItems) {
-            for (int i = 0; i < player.getInventory().getSize(); i++) {
-                ItemStack item = player.getInventory().getItem(i);
-                if (item != null && item.getEnchantments() != null) {
-
-                    for (Map.Entry<Enchantment, Integer> entry : item.getEnchantments().entrySet()) {
-                        int level = entry.getValue();
-
-                        if (level >= 6) {
-                            item.removeEnchantment(entry.getKey());
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
         preparePlayer(player);
     }
 
@@ -193,45 +169,21 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         String world = player.getWorld().getName();
 
-        String key;
-        AttributeInstance instance;
-
         //exiting world
         if (!workingWorld.equals("") && !world.equals(workingWorld)) {
-            key = Attribute.GENERIC_ATTACK_SPEED.name();
-            instance = player.getAttribute(Attribute.valueOf(key));
-
-            if (instance != null && instance.getBaseValue() != 4) {
-                instance.setBaseValue(4);
-            }
+            resetPlayer(player);
 
         } else if (!workingWorld.equals("") && world.equals(workingWorld)) { //entering world
-            key = Attribute.GENERIC_ATTACK_SPEED.name();
-            instance = player.getAttribute(Attribute.valueOf(key));
-
-            if (instance != null && instance.getBaseValue() == 4) {
-                instance.setBaseValue(maxCPS);
-            }
-
             preparePlayer(player);
         }
         //else doesnt do anything, like before
-
     }
 
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
-        String key;
-        AttributeInstance instance;
-
-        key = Attribute.GENERIC_ATTACK_SPEED.name();
-        instance = player.getAttribute(Attribute.valueOf(key));
-
-        if (instance != null && instance.getBaseValue() != 4) {
-            instance.setBaseValue(4);
-        }
+        resetPlayer(player);
     }
 
 
@@ -258,7 +210,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         //with delay checks current selected item...
         mybukkit.runTaskLater(player, null, null, () -> {
                     filterPlayerInventory(player);
-                    //potions and golden apples??
+                    //potions
                 }
                 , 5);
     }
@@ -273,7 +225,6 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
         mybukkit.runTaskLater(player, null, null, () -> {
                     filterPlayerInventory(player);
-                    //potions and golden apples??
                 }
                 , 5);
     }
@@ -285,18 +236,18 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
         if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
 
-        if (noCooldown) {
+        if (event.getDamager() instanceof Player && event.getEntity() instanceof Player) {
 
-            if (event.getDamager() instanceof Player && event.getEntity() instanceof Player) {
+            Player attacker = (Player) event.getDamager();
 
-                Player attacker = (Player) event.getDamager();
+            if (noCooldown) {
                 float cooldown = attacker.getAttackCooldown();
 
                 if (cooldown < 1.0) {
                     event.setDamage(event.getDamage() * (1 / cooldown));
                 }
-
             }
+
         }
     }
 
@@ -316,6 +267,36 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         }
 
         if (fastRespawn) fastSpawn(player);
+    }
+
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerConsume(PlayerItemConsumeEvent event) {
+
+        String world = event.getPlayer().getWorld().getName();
+
+        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+
+        if (event.getItem().getType() == Material.CHORUS_FRUIT || event.getItem().getType() == Material.SUSPICIOUS_STEW || event.getItem().getType() == Material.BEETROOT_SOUP) {
+            event.setCancelled(true);
+        }
+    }
+
+
+    @EventHandler(ignoreCancelled = true)
+    public void onRodHit(ProjectileHitEvent event) {
+        Entity hookEntity = event.getEntity();
+        String world = hookEntity.getWorld().getName();
+
+        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+
+        if (event.getEntityType() == EntityType.FISHING_BOBBER) {
+            Entity defender = event.getHitEntity();
+
+            if (((FishHook) hookEntity).getShooter() instanceof Player && defender != null) { // && event.getHitEntity() instanceof Player
+                defender.setVelocity(calculateKnockBackVelocity(defender.getVelocity(), hookEntity.getVelocity()));
+            }
+        }
     }
 
 
@@ -376,6 +357,37 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
 
     private void preparePlayer(Player player) {
+
+        //make sure they don't bring crap :)
+        if (normalizeHackedItems) {
+            for (int i = 0; i < player.getInventory().getSize(); i++) {
+                ItemStack item = player.getInventory().getItem(i);
+                if (item != null && item.getEnchantments() != null) {
+
+                    for (Map.Entry<Enchantment, Integer> entry : item.getEnchantments().entrySet()) {
+                        int level = entry.getValue();
+
+                        if (level >= 6) {
+                            item.removeEnchantment(entry.getKey());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        //activation fast CPS
+        String key;
+        AttributeInstance instance;
+
+        key = Attribute.GENERIC_ATTACK_SPEED.name();
+        instance = player.getAttribute(Attribute.valueOf(key));
+
+        if (instance != null && instance.getBaseValue() == 4) {
+            instance.setBaseValue(maxCPS);
+        }
+
+        //set shields in off hand and remove totems
         ItemStack it = player.getInventory().getItemInOffHand();
 
         if (it != null) {
@@ -392,10 +404,11 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
                 player.getInventory().remove(it);
             }
 
-            //any free place on normal inventary
+            //put that he/she had on off hand on any free place on normal inventary
             player.getInventory().addItem(it);
         }
 
+        //if player salready has a shield in inv, move it to off hand
         if (player.getInventory().contains(Material.SHIELD)) {
             player.getInventory().remove(Material.SHIELD);
             ItemStack it2 = new ItemStack(Material.SHIELD, 1);
@@ -403,9 +416,33 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             return;
         }
 
+        //else give new shield on off hand
         ItemStack it2 = new ItemStack(Material.SHIELD, 1);
         player.getInventory().setItemInOffHand(it2);
     }
 
+
+    private void resetPlayer(Player player) {
+        //reset to defaults
+        String key;
+        AttributeInstance instance;
+
+        key = Attribute.GENERIC_ATTACK_SPEED.name();
+        instance = player.getAttribute(Attribute.valueOf(key));
+
+        if (instance != null && instance.getBaseValue() != 4) {
+            instance.setBaseValue(4);
+        }
+    }
+
+
+    private Vector calculateKnockBackVelocity(Vector currentVelocity, Vector hookVelocity) {
+
+        //adding vectors with compensation ~ mass difference
+        currentVelocity.add((hookVelocity.multiply(0.45)));
+        currentVelocity.add(new Vector(0, 0.45, 0)); //small knock up
+
+        return currentVelocity;
+    }
 
 }
