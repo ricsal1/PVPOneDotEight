@@ -1,8 +1,10 @@
 package org.pvp.pvponedoteight;
 
+import net.kyori.adventure.text.Component;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.block.Block;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
@@ -10,7 +12,9 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.FishHook;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPlaceEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -21,12 +25,20 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.Repairable;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
-import org.pvp.pvponedoteight.Utils.*;
+import org.pvp.pvponedoteight.GameUtils.ArenaConfig;
+import org.pvp.pvponedoteight.GameUtils.MyPlayer;
+import org.pvp.pvponedoteight.Utils.Metrics;
+import org.pvp.pvponedoteight.Utils.MyBukkit;
+import org.pvp.pvponedoteight.Utils.Utils;
 
 import java.io.File;
+import java.util.Hashtable;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.UUID;
 
 
 public final class PVPOneDotEight extends JavaPlugin implements Listener {
@@ -42,6 +54,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     private boolean fastRespawn;
     private boolean normalizeHackedItems;
     private String workingWorld;
+    private LinkedList<ArenaConfig> myArenas = new LinkedList();
+    private Hashtable<UUID, MyPlayer> playersHash = new Hashtable();
 
     @Override
     public void onEnable() {
@@ -50,17 +64,13 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         mybukkit = new MyBukkit(this);
         getServer().getPluginManager().registerEvents(this, this);
 
-        if (Utils.checkGreater("1.21.1",Bukkit.getServer().getBukkitVersion()) == -1) {
+        if (Utils.checkGreater("1.21.1", Bukkit.getServer().getBukkitVersion()) == -1) {
             getLogger().severe(" You are using a Minecraft Server version with possible data loss and known exploits, get informed and evaluate updating to 1.21.1");
         }
 
         String version = Bukkit.getServer().getName().toUpperCase();
 
-        if (version.contains("BUKKIT") || version.contains("SPIGOT")) {
-            new UpdateCheckerBukkSpig(this, checkOnlineUpdate);
-        } else { //Paper based?
-            new UpdateChecker(this, checkOnlineUpdate);
-        }
+        mybukkit.UpdateChecker(true);
 
         startMetrics();
 
@@ -70,6 +80,15 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+
+        ArenaConfig arena;
+
+        for (int k = 0; k < myArenas.size(); k++) {
+            arena = myArenas.get(k);
+
+            arena.terminateArena();
+        }
+
         getLogger().info(VERSION + " disabled!");
     }
 
@@ -93,6 +112,32 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             fastRespawn = config.getBoolean("fastRespawn", false);
         } catch (Exception e) {
             maxCPS = 16;
+        }
+
+        try {
+            ArenaConfig arena;
+
+            for (int k = 0; k < 100; k++) {
+
+                String[] array = new String[7];
+                array[0] = config.getString("Arenas.Arena" + k + ".a");
+
+                if (array[0] == null) break;
+
+                array[1] = config.getString("Arenas.Arena" + k + ".b");
+                array[2] = config.getString("Arenas.Arena" + k + ".c");
+                array[3] = config.getString("Arenas.Arena" + k + ".d");
+                array[4] = config.getString("Arenas.Arena" + k + ".e");
+                array[5] = config.getString("Arenas.Arena" + k + ".f");
+                array[6] = config.getString("Arenas.Arena" + k + ".g");
+
+                arena = new ArenaConfig();
+                arena.setDimensions(array);
+
+                myArenas.add(arena);
+            }
+        } catch (Exception e) {
+            System.out.println("Arenas. excep  " + e.getMessage());
         }
     }
 
@@ -156,25 +201,59 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        String world = player.getWorld().getName();
+        boolean newPVP = false;
 
-        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+        if (myArenas.size() == 0) {
+            String world = player.getWorld().getName();
+            if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+        } else {
+            MyPlayer myPlayer = playersHash.get(player.getUniqueId());
 
-        preparePlayer(player);
+            if (myPlayer == null) {
+                myPlayer = new MyPlayer();
+                playersHash.put(player.getUniqueId(), myPlayer);
+            }
+
+            ArenaConfig arena = isInArena(player.getLocation());
+
+            if (arena == null) {
+                return;
+            } else {
+                myPlayer.UpdateArena(arena);
+                newPVP = arena.isNewPvp();
+            }
+        }
+
+        preparePlayer(player, newPVP);
     }
 
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerChangedWorldEvent(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
-        String world = player.getWorld().getName();
 
         //exiting world
-        if (!workingWorld.equals("") && !world.equals(workingWorld)) {
-            resetPlayer(player);
+        if (myArenas.size() == 0) {
+            String world = player.getWorld().getName();
 
-        } else if (!workingWorld.equals("") && world.equals(workingWorld)) { //entering world
-            preparePlayer(player);
+            if (!workingWorld.equals("") && !world.equals(workingWorld)) {
+                resetPlayer(player);
+
+            } else if (!workingWorld.equals("") && world.equals(workingWorld)) { //entering world
+                preparePlayer(player, false);
+            }
+        } else {
+            MyPlayer myPlayer = playersHash.get(player.getUniqueId());
+
+            ArenaConfig arena = isInArena(player.getLocation());
+
+            if (arena == null) {
+                myPlayer.UpdateArena(null);
+                resetPlayer(player);
+            } else {
+                myPlayer.UpdateArena(arena);
+                preparePlayer(player, arena.isNewPvp());
+            }
         }
         //else doesnt do anything, like before
     }
@@ -192,7 +271,15 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         Location location = event.getBlock().getLocation();
         String myWorld = location.getWorld().getName();
 
-        if (!workingWorld.equals("") && !myWorld.equals(workingWorld)) return;
+        if (myArenas.size() == 0) {
+            if (!workingWorld.equals("") && !myWorld.equals(workingWorld)) return;
+        } else {
+            MyPlayer myPlayer = playersHash.get(event.getPlayer().getUniqueId());
+
+            if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
+                return;
+            }
+        }
 
         if (event.getEntityType() == EntityType.END_CRYSTAL && !(myWorld.endsWith("_nether") || myWorld.endsWith("_end"))) {
             event.setCancelled(true);
@@ -203,10 +290,17 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onSelect(PlayerItemHeldEvent event) {
         Player player = event.getPlayer();
-        String world = player.getWorld().getName();
 
-        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+        if (myArenas.size() == 0) {
+            String world = player.getWorld().getName();
+            if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+        } else {
+            MyPlayer myPlayer = playersHash.get(player.getUniqueId());
 
+            if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
+                return;
+            }
+        }
         //with delay checks current selected item...
         mybukkit.runTaskLater(player, null, null, () -> {
                     filterPlayerInventory(player);
@@ -219,9 +313,17 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent e) {
         Player player = (Player) e.getWhoClicked();
-        String world = player.getWorld().getName();
 
-        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+        if (myArenas.size() == 0) {
+            String world = player.getWorld().getName();
+            if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+        } else {
+            MyPlayer myPlayer = playersHash.get(player.getUniqueId());
+
+            if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
+                return;
+            }
+        }
 
         mybukkit.runTaskLater(player, null, null, () -> {
                     filterPlayerInventory(player);
@@ -232,22 +334,54 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onEntityHit(EntityDamageByEntityEvent event) {
-        String world = event.getDamager().getWorld().getName();
 
-        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
-
-        if (event.getDamager() instanceof Player && event.getEntity() instanceof Player) {
-
+        if (event.getDamager() instanceof Player) {
             Player attacker = (Player) event.getDamager();
+            MyPlayer myPlayer = null;
 
-            if (noCooldown) {
-                float cooldown = attacker.getAttackCooldown();
+            if (myArenas.size() == 0) {
+                String world = attacker.getWorld().getName();
+                if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
 
-                if (cooldown < 1.0) {
-                    event.setDamage(event.getDamage() * (1 / cooldown));
+            } else {
+                myPlayer = playersHash.get(attacker.getUniqueId());
+
+                if (myPlayer.isInPVPArena() && myPlayer.isNewPVPArena()) {
+                    return;
                 }
             }
 
+            if (myPlayer == null) return;
+
+            if (event.getEntity() instanceof Player) {
+
+                if (!myPlayer.isInPVPArena()) {
+                    event.setCancelled(true);
+                    return;
+                }
+
+                if (!myPlayer.isPlayingPVP()) {
+                    event.setCancelled(true);
+                    return;
+                }
+
+                if (myArenas.size() > 0) {
+                    MyPlayer myPlayer2 = playersHash.get(event.getEntity().getUniqueId());
+
+                    if (!myPlayer2.isPlayingPVP()) {
+                        event.setCancelled(true);
+                        return;
+                    }
+                }
+
+                if (noCooldown) {
+                    float cooldown = attacker.getAttackCooldown();
+
+                    if (cooldown < 1.0) {
+                        event.setDamage(event.getDamage() * (1 / cooldown));
+                    }
+                }
+            }
         }
     }
 
@@ -255,9 +389,17 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getPlayer();
-        String world = player.getWorld().getName();
 
-        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+        if (myArenas.size() == 0) {
+            String world = player.getWorld().getName();
+            if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+        } else {
+            MyPlayer myPlayer = playersHash.get(player.getUniqueId());
+
+            if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
+                return;
+            }
+        }
 
         if (specialEffects) {
             mybukkit.runTaskLater(player, null, null, () -> {
@@ -273,9 +415,16 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPlayerConsume(PlayerItemConsumeEvent event) {
 
-        String world = event.getPlayer().getWorld().getName();
+        if (myArenas.size() == 0) {
+            String world = event.getPlayer().getWorld().getName();
+            if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+        } else {
+            MyPlayer myPlayer = playersHash.get(event.getPlayer().getUniqueId());
 
-        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+            if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
+                return;
+            }
+        }
 
         if (event.getItem().getType() == Material.CHORUS_FRUIT || event.getItem().getType() == Material.SUSPICIOUS_STEW || event.getItem().getType() == Material.BEETROOT_SOUP) {
             event.setCancelled(true);
@@ -285,18 +434,209 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onRodHit(ProjectileHitEvent event) {
-        Entity hookEntity = event.getEntity();
-        String world = hookEntity.getWorld().getName();
-
-        if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
 
         if (event.getEntityType() == EntityType.FISHING_BOBBER) {
-            Entity defender = event.getHitEntity();
+            Entity hookEntity = event.getEntity();
+            ProjectileSource fisher = ((FishHook) hookEntity).getShooter();
 
-            if (((FishHook) hookEntity).getShooter() instanceof Player && defender != null) { // && event.getHitEntity() instanceof Player
-                defender.setVelocity(calculateKnockBackVelocity(defender.getVelocity(), hookEntity.getVelocity()));
+            if (fisher instanceof Player) {
+                Player player = (Player) fisher;
+
+                if (myArenas.size() == 0) {
+                    String world = hookEntity.getWorld().getName();
+                    if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
+
+                } else {
+                    MyPlayer myPlayer = playersHash.get(player.getUniqueId());
+
+                    if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
+                        return;
+                    }
+                }
+
+                Entity defender = event.getHitEntity();
+
+                if (defender != null) { // && event.getHitEntity() instanceof Player
+                    defender.setVelocity(calculateKnockBackVelocity(defender.getVelocity(), hookEntity.getVelocity()));
+                }
             }
         }
+    }
+
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onPlayerMoveEvent(@NotNull PlayerMoveEvent event) {
+
+        //not Arenas mode
+        if (myArenas.size() == 0) return;
+
+        Player player = event.getPlayer();
+        MyPlayer myPlayer = playersHash.get(player.getUniqueId());
+
+        if (!myPlayer.isPlayingPVP() || !player.getGameMode().equals(GameMode.SURVIVAL)) {
+            return;
+        }
+
+        ArenaConfig arena = isInArena(player.getLocation());
+
+        if (arena == null && myPlayer.isInPVPArena()) {
+            player.sendMessage("You are exiting an Arena!");
+            myPlayer.UpdateArena(null);
+            resetPlayer(player);
+        } else {
+            boolean newArena = myPlayer.UpdateArena(arena);
+
+            if (newArena) {
+                player.sendMessage("You are entering an Arena with old PVP mode = " + !arena.isNewPvp());
+                preparePlayer(player, arena.isNewPvp());
+            }
+        }
+    }
+
+
+    @EventHandler(ignoreCancelled = true)
+    public void onArenaClick(PlayerInteractEvent event) {
+
+        Action a = event.getAction();
+        Block block = event.getClickedBlock();
+        ItemStack item = event.getItem();
+
+        if (block == null || item == null) return;
+
+        Player player = event.getPlayer();
+        Location loc = block.getLocation();
+        ArenaConfig arena = null;
+
+        if (!player.isOp()) return;
+
+        if (a.equals(Action.RIGHT_CLICK_BLOCK) && item.getType().equals(Material.BONE)) {
+
+            for (int k = 0; k < myArenas.size(); k++) {
+                arena = myArenas.get(k);
+
+                if (arena.isInArena(loc) && arena.isArenaEditing() && (System.currentTimeMillis() - arena.lastClick < 5000)) {
+
+                    FileConfiguration config = getConfig();
+
+                    for (int delete = 0; delete < myArenas.size(); delete++) {
+                        config.set("Arenas.Arena" + delete + ".a", null);
+                        config.set("Arenas.Arena" + delete + ".b", null);
+                        config.set("Arenas.Arena" + delete + ".c", null);
+                        config.set("Arenas.Arena" + delete + ".d", null);
+                        config.set("Arenas.Arena" + delete + ".e", null);
+                        config.set("Arenas.Arena" + delete + ".f", null);
+                        config.set("Arenas.Arena" + delete + ".g", null);
+                    }
+
+                    myArenas.remove(arena);
+                    arena.endArenaEditing(player);
+                    arena = null;
+
+                    for (int update = 0; update < myArenas.size(); update++) {
+                        arena = myArenas.get(update);
+
+                        String[] list = arena.getDimensions();
+
+                        config.set("Arenas.Arena" + update + ".a", list[0]);
+                        config.set("Arenas.Arena" + update + ".b", list[1]);
+                        config.set("Arenas.Arena" + update + ".c", list[2]);
+                        config.set("Arenas.Arena" + update + ".d", list[3]);
+                        config.set("Arenas.Arena" + update + ".e", list[4]);
+                        config.set("Arenas.Arena" + update + ".f", list[5]);
+                        config.set("Arenas.Arena" + update + ".g", list[6]);
+                    }
+
+                    config.options().copyDefaults(true);
+                    saveConfig();
+
+                    player.sendMessage(Component.text("Arena deleted!"));
+
+                    return;
+                } else if (arena.isInArena(loc)) {
+                    arena.enableArenaEditing(player);
+                    arena.lastClick = System.currentTimeMillis();
+                    player.sendMessage(Component.text("Click again to delete (in less then 5 secs)"));
+                }
+            }
+
+
+        } else if (a.equals(Action.LEFT_CLICK_BLOCK) && item.getType().equals(Material.ARROW)) {
+
+            for (int k = 0; k < myArenas.size(); k++) {
+                arena = myArenas.get(k);
+
+                if (arena.isInArena(loc) && arena.isArenaEditing()) {
+                    arena.endArenaEditing(player);
+                    event.setCancelled(true);
+
+                    //  player.sendMessage("End arena editing");
+
+                    FileConfiguration config = getConfig();
+
+                    String[] list = arena.getDimensions();
+
+                    config.set("Arenas.Arena" + k + ".a", list[0]);
+                    config.set("Arenas.Arena" + k + ".b", list[1]);
+                    config.set("Arenas.Arena" + k + ".c", list[2]);
+                    config.set("Arenas.Arena" + k + ".d", list[3]);
+                    config.set("Arenas.Arena" + k + ".e", list[4]);
+                    config.set("Arenas.Arena" + k + ".f", list[5]);
+                    config.set("Arenas.Arena" + k + ".g", list[6]);
+
+                    config.options().copyDefaults(true);
+                    saveConfig();
+                }
+            }
+
+        } else if (a.equals(Action.RIGHT_CLICK_BLOCK) && item.getType().equals(Material.ARROW)) {
+
+            for (int k = 0; k < myArenas.size(); k++) {
+                arena = myArenas.get(k);
+
+                if (arena.isNearArena(loc)) {
+
+                    if (arena.isArenaFinished() && !arena.isVisible()) {
+                        //     player.sendMessage("enable arena editing");
+                        arena.enableArenaEditing(player);
+                    } else {
+                        //   player.sendMessage("in arena editing");
+                        boolean ok = arena.SetupArena(loc, player);
+
+                        if (!ok) player.sendMessage("Invalid finished position, too small");
+                    }
+
+                    return;
+                }
+            }
+
+            if (arena != null && arena.isArenaEditing()) return;
+
+            if (arena == null || arena.isArenaFinished() && !arena.isNearArena(loc)) {
+                //  player.sendMessage("cria " + (arena == null));
+                arena = new ArenaConfig();
+                arena.SetupArena(loc, player);
+                myArenas.add(arena);
+                return;
+            }
+
+        }
+
+    }
+
+
+    private ArenaConfig isInArena(Location loc) {
+
+        ArenaConfig arena;
+
+        for (int k = 0; k < myArenas.size(); k++) {
+            arena = myArenas.get(k);
+
+            if (arena.isInArena(loc)) {
+                return arena;
+            }
+        }
+
+        return null;
     }
 
 
@@ -356,7 +696,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     }
 
 
-    private void preparePlayer(Player player) {
+    private void preparePlayer(Player player, boolean newPVP) {
 
         //make sure they don't bring crap :)
         if (normalizeHackedItems) {
@@ -375,6 +715,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
                 }
             }
         }
+
+        if (newPVP) return;
 
         //activation fast CPS
         String key;
@@ -444,5 +786,6 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
         return currentVelocity;
     }
+
 
 }
