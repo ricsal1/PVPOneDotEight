@@ -53,6 +53,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     private boolean noCooldown;
     private boolean fastRespawn;
     private boolean normalizeHackedItems;
+    private boolean autoSetShield;
     private String workingWorld;
     private LinkedList<ArenaConfig> myArenas = new LinkedList();
     private Hashtable<UUID, MyPlayer> playersHash = new Hashtable();
@@ -106,9 +107,10 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             checkOnlineUpdate = config.getBoolean("checkUpdate", true);
             specialEffects = config.getBoolean("specialEffects", false);
             normalizeHackedItems = config.getBoolean("normalizeHackedItems", false);
+            noCooldown = config.getBoolean("noCooldown", true);
+            autoSetShield = config.getBoolean("autoSetShield", true);
 
             maxCPS = config.getInt("maxCPS", 16);
-            noCooldown = config.getBoolean("noCooldown", true);
             fastRespawn = config.getBoolean("fastRespawn", false);
         } catch (Exception e) {
             maxCPS = 16;
@@ -153,6 +155,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         config.addDefault("specialEffects", false);
         config.addDefault("normalizeHackedItems", false);
         config.addDefault("noCooldown", true);
+        config.addDefault("autoSetShield", true);
 
         config.options().copyDefaults(true);
         saveConfig();
@@ -345,6 +348,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
             } else {
                 myPlayer = playersHash.get(attacker.getUniqueId());
+
+                if (myPlayer == null) return;
 
                 if (myPlayer.isInPVPArena() && myPlayer.isNewPVPArena()) {
                     return;
@@ -750,17 +755,19 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             player.getInventory().addItem(it);
         }
 
-        //if player salready has a shield in inv, move it to off hand
-        if (player.getInventory().contains(Material.SHIELD)) {
-            player.getInventory().remove(Material.SHIELD);
+        if (autoSetShield) {
+            //if player already has a shield in inv, move it to off hand
+            if (player.getInventory().contains(Material.SHIELD)) {
+                player.getInventory().remove(Material.SHIELD);
+                ItemStack it2 = new ItemStack(Material.SHIELD, 1);
+                player.getInventory().setItemInOffHand(it2);
+                return;
+            }
+
+            //else give new shield on off hand
             ItemStack it2 = new ItemStack(Material.SHIELD, 1);
             player.getInventory().setItemInOffHand(it2);
-            return;
         }
-
-        //else give new shield on off hand
-        ItemStack it2 = new ItemStack(Material.SHIELD, 1);
-        player.getInventory().setItemInOffHand(it2);
     }
 
 
