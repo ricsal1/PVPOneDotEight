@@ -61,8 +61,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
 
-        LoadSettings();
         mybukkit = new MyBukkit(this);
+        LoadSettings();
         getServer().getPluginManager().registerEvents(this, this);
 
         if (Utils.checkGreater("1.21.1", Bukkit.getServer().getBukkitVersion()) == -1) {
@@ -133,7 +133,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
                 array[5] = config.getString("Arenas.Arena" + k + ".f");
                 array[6] = config.getString("Arenas.Arena" + k + ".g");
 
-                arena = new ArenaConfig();
+                arena = new ArenaConfig(this);
                 arena.setDimensions(array);
 
                 myArenas.add(arena);
@@ -485,14 +485,14 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         ArenaConfig arena = isInArena(player.getLocation());
 
         if (arena == null && myPlayer.isInPVPArena()) {
-            player.sendMessage("You are exiting an Arena!");
+            player.sendMessage("Exiting Arena!");
             myPlayer.UpdateArena(null);
             resetPlayer(player);
         } else {
             boolean newArena = myPlayer.UpdateArena(arena);
 
             if (newArena) {
-                player.sendMessage("You are entering an Arena with old PVP mode = " + !arena.isNewPvp());
+                player.sendMessage("In Arena with oldPVP: " + (!arena.isNewPvp() ? ChatColor.GREEN : ChatColor.RED) + !arena.isNewPvp());
                 preparePlayer(player, arena.isNewPvp());
             }
         }
@@ -618,7 +618,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
             if (arena == null || arena.isArenaFinished() && !arena.isNearArena(loc)) {
                 //  player.sendMessage("cria " + (arena == null));
-                arena = new ArenaConfig();
+                arena = new ArenaConfig(this);
                 arena.SetupArena(loc, player);
                 myArenas.add(arena);
                 return;

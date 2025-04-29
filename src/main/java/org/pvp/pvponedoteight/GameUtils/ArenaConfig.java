@@ -10,6 +10,7 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.pvp.pvponedoteight.PVPOneDotEight;
 
 
 public class ArenaConfig {
@@ -23,12 +24,14 @@ public class ArenaConfig {
     private int x1, y1, z1, largx, largz;
     private String world;
     private boolean pvpOldMode = true;
-    private ArmorStand a;
+    private ArmorStand armor;
+    private PVPOneDotEight myPvp;
 
     private Location baseLocation, location2, location3, location4;
 
 
-    public ArenaConfig() {
+    public ArenaConfig(PVPOneDotEight myPvp) {
+        this.myPvp = myPvp;
     }
 
 
@@ -175,7 +178,7 @@ public class ArenaConfig {
             editing = false;
             drawLimits(player, true);
 
-            showArenaLabel(ChatColor.RED + "Arena for oldPVP " + pvpOldMode, true);
+            showArenaLabel(ChatColor.BLACK + "Arena for oldPVP: " + (pvpOldMode ? ChatColor.GREEN : ChatColor.RED) + pvpOldMode, true);
         }
     }
 
@@ -249,14 +252,13 @@ public class ArenaConfig {
         location2 = new Location(Bukkit.getWorld(world), (x1 + largx), y1, z1);
         location3 = new Location(Bukkit.getWorld(world), (x1 + largx), y1, (z1 + largz));
         location4 = new Location(Bukkit.getWorld(world), x1, y1, (z1 + largz));
-
         iniLocal = baseLocation.clone();
 
         pending = false;
         editing = false;
         visible = false;
 
-        showArenaLabel(ChatColor.LIGHT_PURPLE + "Arena from oldPVP " + pvpOldMode, true);
+        showArenaLabel(ChatColor.BLACK + "Arena with oldPVP: " + (pvpOldMode ? ChatColor.GREEN : ChatColor.RED) + pvpOldMode, true);
     }
 
 
@@ -344,30 +346,37 @@ public class ArenaConfig {
 
     private void showArenaLabel(String message, boolean visible) {
 
-        if (a == null && visible) {
+        if (armor == null && visible) {
             Location myLocation = new Location(Bukkit.getWorld(world), Math.abs((x1 + largx / 2)), y1, z1);
 
-            a = (ArmorStand) myLocation.getWorld().spawnEntity(myLocation, EntityType.ARMOR_STAND);
-            a.setVisible(false);
+            myPvp.mybukkit.runTaskLater(null, myLocation, null, () -> {
+                armor = (ArmorStand) myLocation.getWorld().spawnEntity(myLocation, EntityType.ARMOR_STAND);
+                armor.setVisible(false);
 
-            String key;
-            AttributeInstance instance;
+                String key;
+                AttributeInstance instance;
 
-            key = Attribute.GENERIC_SCALE.name();
-            instance = a.getAttribute(Attribute.valueOf(key));
+                key = Attribute.GENERIC_SCALE.name();
+                instance = armor.getAttribute(Attribute.valueOf(key));
 
-            if (instance != null) {
-                instance.setBaseValue(2);
-            }
+                if (instance != null) {
+                    instance.setBaseValue(2);
+                }
+
+                armor.customName(Component.text(message));
+                armor.setCustomNameVisible(true);
+            }, 5);
+
+            return;
         }
 
         if (visible) {
-            a.customName(Component.text(message));
-            a.setCustomNameVisible(true);
+            armor.customName(Component.text(message));
+            armor.setCustomNameVisible(true);
         } else {
-            if (a != null) {
-                a.remove();
-                a = null;
+            if (armor != null) {
+                armor.remove();
+                armor = null;
             }
         }
     }
