@@ -279,6 +279,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         } else {
             MyPlayer myPlayer = playersHash.get(event.getPlayer().getUniqueId());
 
+            if (myPlayer == null) return;
+
             if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
                 return;
             }
@@ -299,6 +301,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
         } else {
             MyPlayer myPlayer = playersHash.get(player.getUniqueId());
+
+            if (myPlayer == null) return;
 
             if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
                 return;
@@ -322,6 +326,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
         } else {
             MyPlayer myPlayer = playersHash.get(player.getUniqueId());
+
+            if (myPlayer == null) return;
 
             if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
                 return;
@@ -401,6 +407,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         } else {
             MyPlayer myPlayer = playersHash.get(player.getUniqueId());
 
+            if (myPlayer == null) return;
+
             if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
                 return;
             }
@@ -425,6 +433,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
             if (!workingWorld.equals("") && !world.equals(workingWorld)) return;
         } else {
             MyPlayer myPlayer = playersHash.get(event.getPlayer().getUniqueId());
+
+            if (myPlayer == null) return;
 
             if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
                 return;
@@ -453,6 +463,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
 
                 } else {
                     MyPlayer myPlayer = playersHash.get(player.getUniqueId());
+
+                    if (myPlayer == null) return;
 
                     if (!myPlayer.isInPVPArena() || myPlayer.isNewPVPArena()) {
                         return;
