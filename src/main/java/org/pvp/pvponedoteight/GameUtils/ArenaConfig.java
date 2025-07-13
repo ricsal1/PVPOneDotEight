@@ -1,6 +1,6 @@
 package org.pvp.pvponedoteight.GameUtils;
 
-import net.kyori.adventure.text.Component;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -43,7 +43,8 @@ public class ArenaConfig {
             z1 = iniLocal.getBlockZ();
             world = local.getWorld().getName();
             player.sendBlockChange(local, Material.GLOWSTONE.createBlockData());
-            player.sendMessage(Component.text("Right click again on the opposite border"));
+
+            player.sendMessage("Right click again on the opposite border");
             return true;
         }
 
@@ -142,7 +143,7 @@ public class ArenaConfig {
             pending = false;
             editing = true;
 
-            player.sendMessage(Component.text("Left click to save or right click to adjust"));
+            player.sendMessage("Left click to save or right click to adjust");
             drawLimits(player, false);
         }
 
@@ -151,7 +152,7 @@ public class ArenaConfig {
 
 
     public void terminateArena() {
-        showArenaLabel("", false);
+        myPvp.mybukkit.showArenaLabel(armor,new Location(Bukkit.getWorld(world), Math.abs((x1 + largx / 2)), y1, z1),"", false, true);
     }
 
 
@@ -169,16 +170,20 @@ public class ArenaConfig {
         editing = true;
         drawLimits(player, false);
 
-        showArenaLabel("Editing Arena", false);
+        myPvp.mybukkit.showArenaLabel(armor,new Location(Bukkit.getWorld(world), Math.abs((x1 + largx / 2)), y1, z1),"Editing Arena", false, false);
     }
 
 
-    public void endArenaEditing(Player player) {
+    public void endArenaEditing(Player player, boolean delete) {
         if (editing) {
             editing = false;
             drawLimits(player, true);
 
-            showArenaLabel(ChatColor.BLACK + "Arena for oldPVP: " + (pvpOldMode ? ChatColor.GREEN : ChatColor.RED) + pvpOldMode, true);
+            if (delete) {
+                myPvp.mybukkit.showArenaLabel(armor,new Location(Bukkit.getWorld(world), Math.abs((x1 + largx / 2)), y1, z1),"", false, false);
+            } else {
+                myPvp.mybukkit.showArenaLabel(armor,new Location(Bukkit.getWorld(world), Math.abs((x1 + largx / 2)), y1, z1),ChatColor.BLACK + "Arena for oldPVP: " + (pvpOldMode ? ChatColor.GREEN : ChatColor.RED) + pvpOldMode, true, false);
+            }
         }
     }
 
@@ -188,7 +193,7 @@ public class ArenaConfig {
     }
 
 
-    public Boolean isNewPvp() {
+    public Boolean isNewPvpMode() {
         return !pvpOldMode;
     }
 
@@ -258,7 +263,7 @@ public class ArenaConfig {
         editing = false;
         visible = false;
 
-        showArenaLabel(ChatColor.BLACK + "Arena with oldPVP: " + (pvpOldMode ? ChatColor.GREEN : ChatColor.RED) + pvpOldMode, true);
+        myPvp.mybukkit.showArenaLabel(armor,new Location(Bukkit.getWorld(world), Math.abs((x1 + largx / 2)), y1, z1),ChatColor.BLACK + "Arena with oldPVP: " + (pvpOldMode ? ChatColor.GREEN : ChatColor.RED) + pvpOldMode, true, false);
     }
 
 
@@ -299,16 +304,17 @@ public class ArenaConfig {
         for (int x = 0; x <= xLimit; x++) {
 
             for (int z = 0; z <= zLimit; z++) {
-                loc.set(x1, y1, z1).add(x, 0, z);
+                loc = baseLocation.clone();
+                loc.add(x, 0, z);
                 aux = loc.clone();
                 aux.add(0, 1, 0);
 
                 //y self adjustment
                 for (int y = 0; y < 7; y++) {
                     //just ok
-                    if (loc.getBlock().isSolid() && aux.getBlock().isEmpty()) {
+                    if (loc.getBlock().getType().isSolid() && aux.getBlock().isEmpty()) {
                         break;
-                    } else if (loc.getBlock().isSolid() && aux.getBlock().isSolid()) { //up up
+                    } else if (loc.getBlock().getType().isSolid() && aux.getBlock().getType().isSolid()) { //up up
                         //    player.sendMessage(x + ":" +z + " sobe "+loc.getBlockY() + " " + aux.getBlockY() + "   " + loc.getBlock() + "   " + aux.getBlock());
                         loc.add(0, 1, 0);
                         aux.add(0, 1, 0);
@@ -344,42 +350,6 @@ public class ArenaConfig {
     }
 
 
-    private void showArenaLabel(String message, boolean visible) {
-
-        if (armor == null && visible) {
-            Location myLocation = new Location(Bukkit.getWorld(world), Math.abs((x1 + largx / 2)), y1, z1);
-
-            myPvp.mybukkit.runTaskLater(null, myLocation, null, () -> {
-                armor = (ArmorStand) myLocation.getWorld().spawnEntity(myLocation, EntityType.ARMOR_STAND);
-                armor.setVisible(false);
-
-                String key;
-                AttributeInstance instance;
-
-                key = Attribute.GENERIC_SCALE.name();
-                instance = armor.getAttribute(Attribute.valueOf(key));
-
-                if (instance != null) {
-                    instance.setBaseValue(2);
-                }
-
-                armor.customName(Component.text(message));
-                armor.setCustomNameVisible(true);
-            }, 5);
-
-            return;
-        }
-
-        if (visible) {
-            armor.customName(Component.text(message));
-            armor.setCustomNameVisible(true);
-        } else {
-            if (armor != null) {
-                armor.remove();
-                armor = null;
-            }
-        }
-    }
 
 
 }

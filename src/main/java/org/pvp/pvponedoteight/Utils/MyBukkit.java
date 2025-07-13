@@ -7,6 +7,8 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
@@ -165,6 +167,67 @@ public class MyBukkit {
     }
 
 
+    public void showArenaLabel(ArmorStand armor1, Location location, String message, boolean visible, boolean shutdown) {
+
+        if (armor1 == null && visible) {
+            Location myLocation = location.clone();
+            final ArmorStand[] armor = {armor1};
+
+            runTaskLater(null, myLocation, null, () -> {
+                //System.out.println("Register Armour " + myLocation);
+                armor[0] = (ArmorStand) myLocation.getWorld().spawnEntity(myLocation, EntityType.ARMOR_STAND);
+                armor[0].setVisible(false);
+
+                String key;
+                AttributeInstance instance;
+
+                key = Attribute.GENERIC_SCALE.name();
+                instance = armor[0].getAttribute(Attribute.valueOf(key));
+
+                if (instance != null) {
+                    instance.setBaseValue(2);
+                }
+
+                if (isPaperBased) {
+                    myBukkitPaper.hologramCustomName(armor[0], message);
+                }
+                else {
+                    armor[0].setCustomName(message);
+                }
+                armor[0].setCustomNameVisible(true);
+            }, 100);
+
+            return;
+        }
+
+        if (visible) {
+            //System.out.println("reusing Armour ");
+            if (isPaperBased) {
+                myBukkitPaper.hologramCustomName(armor1, message);
+            }
+            else {
+                armor1.setCustomName(message);
+            }
+
+            armor1.setCustomNameVisible(true);
+        } else {
+
+            if (armor1 != null) {
+
+                if (shutdown) {
+                    armor1.remove();
+                } else {
+                    ArmorStand finalA = armor1;
+                    runTaskLater(null, null, armor1, () -> {
+                        finalA.remove();
+                    }, 1);
+                }
+                armor1 = null;
+            }
+        }
+    }
+
+
     public void setMeta(ItemMeta meta, String text) {
         if (isPaperBased) {
             myBukkitPaper.metaDisplayName(meta, text);
@@ -200,6 +263,14 @@ public class MyBukkit {
     }
 
 
+//    public void sendMessageWithComponent(Player player, String text) {
+//        if (isPaper())
+//            player.sendMessage(text, textComponent, getNamedTextColorFromString(color));
+//        else
+//            Bukkit.getConsoleSender().sendMessage(text + ChatColor.valueOf(color) + textComponent);
+//    }
+
+
     public void teamAddEntity(Team myTeam, Player player) {
         if (isPaperBased) {
             myTeam.addEntity(player);
@@ -209,9 +280,9 @@ public class MyBukkit {
     }
 
 
-    public void playerTeleport(Player player, Location loc) {
+    public void playerTeleport(Entity player, Location loc) {
         if (isPaperBased) {
-            runTaskLater(player, null, null, () -> player.teleportAsync(loc), 5);
+            runTaskLater(null, null, player, () -> player.teleportAsync(loc), 5);
         } else {
             player.teleport(loc);
         }
