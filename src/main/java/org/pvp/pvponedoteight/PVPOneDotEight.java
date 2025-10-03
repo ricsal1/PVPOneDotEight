@@ -55,6 +55,7 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     private String workingWorld;
     private LinkedList<ArenaConfig> myArenas = new LinkedList();
     private Hashtable<UUID, MyPlayer> playersHash = new Hashtable();
+    private Hashtable<UUID, String> playerKnockback1dot8 = new Hashtable();
 
     @Override
     public void onEnable() {
@@ -70,6 +71,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         String version = Bukkit.getServer().getName().toUpperCase();
 
         mybukkit.UpdateChecker(true);
+
+        mybukkit.runTaskTimer(null, null, null, () -> ShowPlayerInArena(), 0, 40);
 
         startMetrics();
 
@@ -392,6 +395,8 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
                         event.setDamage(event.getDamage() * (1 / cooldown));
                     }
                 }
+
+                applyLegacyKB((Player) event.getEntity(), attacker);
             }
         }
     }
@@ -517,14 +522,14 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
         ArenaConfig arena = isInArena(player.getLocation());
 
         if (arena == null && myPlayer.isInPVPArena()) {
-            player.sendMessage("Exiting Arena!");
+          //  player.sendMessage("Exiting Arena!");
             myPlayer.UpdateArena(null);
             resetPlayer(player);
         } else {
             boolean newArena = myPlayer.UpdateArena(arena);
 
             if (newArena) {
-                player.sendMessage("In Arena with oldPVP: " + (!arena.isNewPvpMode() ? ChatColor.GREEN : ChatColor.RED) + !arena.isNewPvpMode());
+              //  player.sendMessage("In Arena with oldPVP: " + (!arena.isNewPvpMode() ? ChatColor.GREEN : ChatColor.RED) + !arena.isNewPvpMode());
                 preparePlayer(player, arena.isNewPvpMode());
             }
         }
@@ -869,7 +874,100 @@ public final class PVPOneDotEight extends JavaPlugin implements Listener {
     }
 
 
+    public void applyLegacyKB(Player victim, Player attacker) {
+
+        if (playerKnockback1dot8.get(victim.getUniqueId()) != null) return;
+
+//        NO SPRINT:
+//        First hit: 1.9840935756
+//
+//        Holding W:
+//
+//        Consecutive hit ground:1.7042985175
+//        Consecutive hit airborne: 1.9840935756
+//
+//        Sprint Reset:
+//
+//        Consecutive hit ground: 1.9840935756
+//        Consecutive hit airborne: 1.9840935756
+//
+//        SPRINTING:
+//        First hit: 4.9383919409
+//
+//        Holding W:
+//
+//        Consecutive hit ground: 1.9840935756
+//        Consecutive hit airborne: 1.9840935756
+//
+//        Sprint Reset:
+//
+//        Consecutive hit ground: 4.9383919409
+//        Consecutive hit airborne: WIP*
+//
+//        {6.355 < x < 6.726}
+
+        double BASE_KB = 0.4;   // valor horizontal médio, simula o knockback horizontal “normal” do 1.8.
+        double SPRINT_KB = 0.2; // extra quando sprint,adiciona a distância extra do primeiro hit com sprint (≈4.94 blocos).
+        double VERTICAL_KB = 0.38; // impulso vertical típico 1.8.
+        double DAMPING = 0.6;    // reduce old velocity
+
+
+// //        Direção horizontal do atacante -> vítima
+//        Vector direction = victim.getLocation().toVector()
+//                .subtract(attacker.getLocation().toVector())
+//                .setY(0) // só horizontal
+//                .normalize();
+
+        Vector direction = victim.getLocation().getDirection().normalize();
+        // Reset horizontal velocity
+        direction = direction.setX(direction.getX() * DAMPING);
+        direction = direction.setY(0);
+        direction = direction.setZ(direction.getZ() * DAMPING);
+
+        // Intensidade horizontal
+        double strength = BASE_KB + (attacker.isSprinting() ? SPRINT_KB : 0);
+
+        // Vetor de knockback
+        Vector kb = direction.multiply(strength);
+
+        // Impulso vertical (apenas se a vítima está no chão)
+        if (victim.isOnGround()) {
+            kb.setY(VERTICAL_KB);
+        }
+
+        if (kb.getX() > 500 || kb.getZ() > 500) return;
+
+
+        double resistance = (double) 1.0F - victim.getAttribute(Attribute.GENERIC_KNOCKBACK_RESISTANCE).getValue();
+        kb.multiply(new Vector(resistance, 1.0F, resistance));
+
+        //System.out.println(" x " + kb.getX() + "   z " + kb.getZ());
+
+        // Aplica ao jogador
+        victim.setVelocity(kb);
+
+        playerKnockback1dot8.put(victim.getUniqueId(), "");
+
+        mybukkit.runTaskLater(victim, null, null, () -> playerKnockback1dot8.remove(victim.getUniqueId()), 2l);
+    }
+
+
+
     public Hashtable<UUID, MyPlayer> getPlayersHash() {
         return playersHash;
     }
+
+
+    public void ShowPlayerInArena() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+
+            MyPlayer myPlayer = playersHash.get(player.getUniqueId());
+
+            if (myPlayer == null) continue;
+
+            if (myPlayer.isInPVPArena())
+                mybukkit.sendActionBar(player, ChatColor.GREEN +"In pvpArena");
+        }
+    }
+
 }

@@ -65,6 +65,7 @@ public class PVPPlaceholderHandler extends PlaceholderExpansion {
         return returnString;
     }
 
+
     private String isInArena(Player player) {
         MyPlayer myPlayer = plugin.getPlayersHash().get(player.getUniqueId());
 
@@ -76,6 +77,7 @@ public class PVPPlaceholderHandler extends PlaceholderExpansion {
 
         return "0";
     }
+
 
     private int playersInInArena() {
         int counter = 0;

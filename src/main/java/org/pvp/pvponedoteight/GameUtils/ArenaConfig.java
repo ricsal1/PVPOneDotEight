@@ -278,14 +278,6 @@ public class ArenaConfig {
 
         if (!hideArena) {
             if (counter - lastClick < 250000000) {
-
-//                TextComponent textComponent = Component.text("Click me");
-//
-//                textComponent.clickEvent(ClickEvent.clickEvent(ClickEvent.Action.RUN_COMMAND, "/say hi"));
-//                textComponent.hoverEvent(HoverEvent.hoverEvent(HoverEvent.Action.SHOW_TEXT, textComponent));
-//
-//                player.sendMessage(textComponent);
-
                 pvpOldMode = !pvpOldMode;
             }
             lastClick = counter;
@@ -315,11 +307,9 @@ public class ArenaConfig {
                     if (loc.getBlock().getType().isSolid() && aux.getBlock().isEmpty()) {
                         break;
                     } else if (loc.getBlock().getType().isSolid() && aux.getBlock().getType().isSolid()) { //up up
-                        //    player.sendMessage(x + ":" +z + " sobe "+loc.getBlockY() + " " + aux.getBlockY() + "   " + loc.getBlock() + "   " + aux.getBlock());
                         loc.add(0, 1, 0);
                         aux.add(0, 1, 0);
                     } else if (loc.getBlock().isEmpty() && aux.getBlock().isEmpty()) { //down boy
-                        //     player.sendMessage(x + ":" +z + " desc "+loc.getBlockY() + " " + aux.getBlockY() + "   " + loc.getBlock().getType() + "   " + aux.getBlock().getType());
                         loc.add(0, -1, 0);
                         aux.add(0, -1, 0);
                     }
